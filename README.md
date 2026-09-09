@@ -1,3 +1,7 @@
+<img width="150" height="150" alt="favicon" src="https://github.com/user-attachments/assets/50c7de83-6a3f-42d2-a4bc-a24fa4c3c5a5" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="9" fill="#f5f3eb"/><path d="M9 13h24v8H17v6h22v8H9z" fill="#dd532a"/><path d="M36 5v10m-5-5h10" stroke="#dd532a" stroke-width="3"/></svg>
+
+
 # SatSlots
 
 **Your space. Your terms. Your sats.**
