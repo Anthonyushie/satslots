@@ -10,7 +10,7 @@ A responsive sponsorship-marketplace landing page built with **Next.js 16 App Ro
 
 ## Quick start
 
-Requires Node.js **20.9 or newer**. A currently supported Node.js LTS release is recommended.
+Requires Node.js **20.19 or newer** (including the Nostr cryptography dependencies). A currently supported Node.js LTS release is recommended.
 
 ```sh
 npm ci
@@ -86,7 +86,9 @@ For a system-installed Chromium, optionally set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_
 
 **Working:** filters, listing details, duration-based prices, a simulated booking journey, publisher/advertiser instructions, local listing creation/removal, themes, FAQs, and mobile navigation.
 
-**Not implemented:** Nostr authentication or relay publishing, website ownership verification, real availability or reservations, publisher approval, Lightning invoices or settlement, banner delivery, or dispute handling. The page and dialogs label these limitations explicitly. No keys or credentials are required.
+**Not connected in the UI:** Nostr identity or relay publishing. A standalone P0 service is available in `src/lib/nostr` for NIP-07 connection/signing, profile mapping, listing publication, and validated relay discovery. See the [integration handoff for @wutche](docs/nostr-integration.md) and [listing event contract](docs/nostr-listing-event.md). Run `npm run test:nostr` for isolated service tests. Backend authentication is separate from connecting a Nostr extension.
+
+**Not implemented:** website ownership verification, real availability or reservations, publisher approval, Lightning invoices or settlement, banner delivery, or dispute handling. The page and dialogs label these limitations explicitly. No keys or credentials are required to browse the existing demo; Nostr signing requires a NIP-07 extension, which keeps private keys outside the app.
 
 Publisher form data stays in browser memory and disappears on reload. The website field is checked for an HTTP(S) URL but is not contacted or verified. No analytics, tracking pixels, signup endpoint, wallet, or real payment is connected. React escapes publisher-supplied text.
 
