@@ -1,26 +1,26 @@
 "use client";
 
 import { createContext, useContext, type RefObject } from "react";
-import type {
-  Listing,
-  LocalListingInput,
-  MarketplaceFilter,
-} from "@/lib/marketplace";
+import type { MarketplaceFilter } from "@/lib/marketplace";
+import type { NostrListing } from "@/lib/nostr";
+import type { useNostrIdentity } from "./use-nostr-identity";
+import type { useNostrMarketplace } from "./use-nostr-marketplace";
 
 export type ModalSelection =
   | { kind: "publisher" }
   | { kind: "about" }
-  | { kind: "placement"; listingId: string };
+  | { kind: "campaigns" }
+  | { kind: "placement"; listingAddress: string };
 export interface ExperienceContextValue {
-  listings: readonly Listing[];
+  listings: readonly NostrListing[];
+  identity: ReturnType<typeof useNostrIdentity>;
+  marketplace: ReturnType<typeof useNostrMarketplace>;
   filter: MarketplaceFilter;
   setFilter: (filter: MarketplaceFilter) => void;
   modal: ModalSelection | null;
   openModal: (selection: ModalSelection, trigger?: HTMLElement) => void;
   closeModal: () => void;
   restoreFocus: () => void;
-  addListing: (listing: LocalListingInput) => void;
-  removeListing: (id: string) => void;
   marketplaceRef: RefObject<HTMLElement | null>;
 }
 export const ExperienceContext = createContext<ExperienceContextValue | null>(

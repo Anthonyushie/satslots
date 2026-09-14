@@ -1,3 +1,4 @@
+import { CampaignAreaButton } from "./interactive/campaign-area";
 import { ProjectNotesButton } from "@/components/interactive/experience-provider";
 
 export function Footer() {
@@ -21,9 +22,10 @@ export function Footer() {
           <br />
           <span>The independent ad marketplace.</span>
         </p>
-        <nav className="flex gap-6" aria-label="Footer navigation">
+        <nav className="flex flex-wrap gap-6" aria-label="Footer navigation">
           <a href="#spaces">Explore</a>
           <a href="#questions">Questions</a>
+          <CampaignAreaButton />
           <ProjectNotesButton>Project notes ↗</ProjectNotesButton>
         </nav>
       </div>

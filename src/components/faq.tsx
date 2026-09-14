@@ -6,7 +6,7 @@ const questions = [
   {
     question: "Can I book a placement right now?",
     answer:
-      "Not yet. This is an interactive landing-page demo. Explore the sample placements or create a local listing preview. There are no live publishers, wallet connections, or real payments here.",
+      "Not yet. You can connect a Nostr identity and browse public relay listings, but publishers and availability are unverified. Publishing, booking, and payments remain unavailable until backend contracts are connected.",
   },
   {
     question: "Why bitcoin? Why sats?",
@@ -26,7 +26,7 @@ const questions = [
   {
     question: "What if the marketplace disappears?",
     answer:
-      "The intended design publishes signed listings to multiple Nostr relays, so another compatible app can read available copies using the same identity. This portability is a project goal, not a feature implemented in this demo. Relays, publishers, and hosting services can still go offline.",
+      "The intended design publishes signed listings to multiple Nostr relays, so another compatible app can read available copies using the same identity. This frontend reads compatible relay listings; publishing and database persistence are not connected yet. Relays, publishers, and hosting services can still go offline.",
   },
   {
     question: "Do I need a huge audience?",

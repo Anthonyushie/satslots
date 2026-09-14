@@ -2460,3 +2460,107 @@ html.dark {
   background: var(--art-stage);
   padding: 2px 4px;
 }
+
+/* The account disclosure remains usable on narrow screens and both themes. */
+.nostr-account {
+  position: relative;
+}
+.nostr-account-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 1rem);
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid currentColor;
+  box-shadow: 0 8px 24px #0002;
+  overflow-wrap: anywhere;
+  z-index: 30;
+}
+.nostr-account-panel p {
+  margin-bottom: 0.75rem;
+}
+.nostr-account-panel button {
+  margin: 0.25rem 0.75rem 0.5rem 0;
+}
+.marketplace-status {
+  margin: 1rem 0;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.listing-card {
+  overflow-wrap: anywhere;
+}
+
+.nostr-account > button {
+  display: block;
+  max-width: min(10rem, 26vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .nav-row {
+    position: relative;
+  }
+  .nostr-account {
+    position: static;
+  }
+  .nostr-account-panel {
+    top: 100%;
+    max-height: calc(100dvh - 7rem);
+    overflow-y: auto;
+  }
+}
+
+/* Planning surfaces reuse the marketplace's paper, ink, and dialog layout. */
+.feature-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+.feature-section h3,
+.feature-section h4 {
+  margin-bottom: 12px;
+}
+.feature-action {
+  margin-block: 18px;
+}
+.feature-filename,
+.ad-creative,
+.site-dialog .booking-summary {
+  overflow-wrap: anywhere;
+}
+.site-dialog .booking-summary > div > span {
+  min-width: 0;
+}
+.ad-creative {
+  padding: 20px;
+  border: 1px solid var(--rule);
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.ad-creative .eyebrow {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.ad-creative img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
+.feature-filename {
+  font-size: 11px;
+  color: var(--muted);
+  margin-block: 12px;
+}

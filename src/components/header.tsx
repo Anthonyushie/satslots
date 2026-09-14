@@ -1,5 +1,7 @@
 "use client";
 
+import { NostrAccount } from "./interactive/nostr-account";
+
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ListSpaceButton } from "@/components/interactive/experience-provider";
 
@@ -80,6 +82,7 @@ export function Header() {
           <a href="#why-satslots">Why SatSlots</a>
         </nav>
         <div className="flex items-center gap-3">
+          <NostrAccount />
           <button
             type="button"
             className="theme-toggle icon-button"
