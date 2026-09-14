@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { listingEvent, mockRelays } from "./nostr-fixture";
 
 test.beforeEach(async ({ page }) => {
+  await mockRelays(page, { events: [listingEvent()] });
   await page.goto("/");
   await expect(page.locator("#hero-title")).toBeVisible();
+  await expect(page.locator(".listing-card")).toHaveCount(1);
 });
 
 test("hydrates without React errors or failed assets", async ({ page }) => {
@@ -11,22 +14,22 @@ test("hydrates without React errors or failed assets", async ({ page }) => {
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("requestfailed", (request) => failures.push(request.url()));
   await page.reload({ waitUntil: "networkidle" });
-  await expect(page.locator(".listing-card")).toHaveCount(3);
+  await expect(page.locator(".listing-card")).toHaveCount(1);
   expect(errors).toEqual([]);
   expect(failures).toEqual([]);
   expect(await page.title()).toContain("SatSlots");
 });
 
-test("filters placements and switches publisher instructions", async ({
+test("filters relay placements and switches publisher instructions", async ({
   page,
 }) => {
+  await page.getByRole("button", { name: "Bitcoin", exact: true }).click();
+  await expect(page.locator(".listing-card:visible")).toHaveCount(0);
+  await expect(
+    page.getByText("No listings match this category."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Design", exact: true }).click();
   await expect(page.locator(".listing-card:visible")).toHaveCount(1);
-  await expect(page.locator(".listing-card:visible h3")).toContainText(
-    "Offscript",
-  );
-  await page.locator('[data-filter="all"]').click();
-  await expect(page.locator(".listing-card:visible")).toHaveCount(3);
   await page.getByRole("button", { name: "I’m a publisher" }).click();
   await expect(page.locator("#steps")).toContainText(
     "Make room for a good fit.",
@@ -37,86 +40,48 @@ test("filters placements and switches publisher instructions", async ({
   );
 });
 
-test("calculates a booking and completes only a simulated payment", async ({
+test("booking is explicitly blocked and native dialog restores focus", async ({
   page,
 }) => {
-  const trigger = page.locator('[data-placement="fieldnotes"]');
+  const trigger = page.locator("[data-placement]");
   await trigger.click();
-  await page.locator("#booking-days").fill("3");
-  await expect(page.locator("#booking-summary")).toContainText("15,000 sats");
-  await page.getByRole("button", { name: "Preview booking request" }).click();
-  await expect(page.locator("#placement-title")).toContainText(
-    "A little human",
+  await expect(page.locator("#placement-content")).toContainText("3,000 sats");
+  await expect(
+    page.getByRole("button", { name: "Booking unavailable" }),
+  ).toBeDisabled();
+  await expect(page.locator("#booking-unavailable")).toContainText(
+    "No booking is created",
   );
-  await page
-    .getByRole("button", { name: "Simulate publisher approval" })
-    .click();
-  await expect(page.locator("#placement-content")).toContainText(
-    "No invoice is generated",
-  );
-  await page
-    .getByRole("button", { name: "Simulate payment", exact: true })
-    .click();
-  await expect(page.locator("#placement-content")).toContainText(
-    "NO MONEY MOVED",
-  );
-  await page.getByRole("button", { name: "Explore another space" }).click();
+  await expect(page.getByRole("button", { name: /Simulate/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(page.locator("#placement-dialog")).not.toBeVisible();
   await expect(trigger).toBeFocused();
   await expect(page.locator("body")).not.toHaveClass(/dialog-open/);
 });
 
-test("rejects booking durations outside 1–30 days", async ({ page }) => {
-  await page.locator('[data-placement="offscript"]').click();
-  for (const days of ["0", "31", "1.5", ""]) {
-    await page.locator("#booking-days").fill(days);
-    await page.getByRole("button", { name: "Preview booking request" }).click();
-    await expect(page.locator("#booking-days")).toBeVisible();
-    expect(
-      await page
-        .locator("#booking-days")
-        .evaluate((el: HTMLInputElement) => el.validity.valid),
-    ).toBeFalsy();
-  }
-});
-
-test("creates and removes an escaped local listing preview", async ({
+test("publisher form never inserts local inventory or sends a mutation", async ({
   page,
 }) => {
-  await page.locator(".nav-cta").click();
+  const mutations: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() !== "GET") mutations.push(request.url());
+  });
+  const trigger = page.locator(".nav-cta");
+  await trigger.click();
   await page.locator("#site-name").fill("Indie <script> & Open");
   await page.locator("#site-url").fill("https://example.com");
-  await page.locator("#site-category").selectOption("Development");
-  await page.locator("#site-price").fill("2500");
+  await page.locator("#site-description").fill("Independent creators.");
+  await expect(
+    page.getByRole("button", { name: "Publishing unavailable" }),
+  ).toBeDisabled();
   await page
-    .locator("#site-description")
-    .fill("A publication for independent makers & open-source builders.");
-  await page.getByRole("button", { name: "Create my listing preview" }).click();
-  await expect(page.locator(".listing-card")).toHaveCount(4);
-  const card = page.locator(".listing-card").first();
-  await expect(card.locator("h3")).toContainText("Indie <script> & Open");
-  await expect(card.locator("script")).toHaveCount(0);
-  await card.locator("[data-placement]").click();
-  await page.getByRole("button", { name: "Remove this local preview" }).click();
-  await expect(page.locator(".listing-card")).toHaveCount(3);
-});
-
-test("validates publisher input without making external requests", async ({
-  page,
-}) => {
-  await page.locator(".nav-cta").click();
-  await page.locator("#site-name").fill("My publication");
-  await page.locator("#site-url").fill("ftp://example.com");
-  await page
-    .locator("#site-description")
-    .fill("A small audience of independent creators.");
-  await page.getByRole("button", { name: "Create my listing preview" }).click();
+    .locator("#publisher-form")
+    .evaluate((form: HTMLFormElement) => form.requestSubmit());
   await expect(page.locator("#publisher-dialog")).toBeVisible();
-  await page.locator("#site-url").fill("https://example.com");
-  await page.locator("#site-name").fill("   ");
-  await page.getByRole("button", { name: "Create my listing preview" }).click();
-  await expect(page.locator("#publisher-dialog")).toBeVisible();
-  await expect(page.locator(".listing-card")).toHaveCount(3);
+  await expect(page.locator(".listing-card")).toHaveCount(1);
+  expect(mutations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();
 });
 
 test("Escape closes dialogs and FAQ keeps one answer open", async ({
@@ -124,7 +89,7 @@ test("Escape closes dialogs and FAQ keeps one answer open", async ({
 }) => {
   await page.getByRole("button", { name: "Project notes" }).click();
   await expect(page.locator("#about-dialog")).toContainText(
-    "Nostr identity and relay publishing",
+    "Authenticated backend sessions",
   );
   await page.keyboard.press("Escape");
   await expect(page.locator("#about-dialog")).not.toBeVisible();
@@ -163,7 +128,7 @@ test("mobile navigation and dialog remain usable", async ({ page }) => {
   await expect(page.locator("#mobile-nav")).toBeVisible();
   await page.locator('#mobile-nav a[href="#spaces"]').click();
   await expect(page.locator("#mobile-nav")).not.toBeVisible();
-  await page.locator('[data-placement="quietbuild"]').click();
+  await page.locator("[data-placement]").click();
   expect(
     await page.locator("#placement-dialog").evaluate((el) => {
       const rect = el.getBoundingClientRect();

@@ -2,20 +2,14 @@
 
 import {
   useCallback,
-  useEffect,
-  useMemo,
   useRef,
   useState,
   type ComponentPropsWithRef,
   type ReactNode,
 } from "react";
-import {
-  sampleListings,
-  type Listing,
-  type LocalListing,
-  type LocalListingInput,
-  type MarketplaceFilter,
-} from "@/lib/marketplace";
+import { type MarketplaceFilter } from "@/lib/marketplace";
+import { useNostrIdentity } from "./use-nostr-identity";
+import { useNostrMarketplace } from "./use-nostr-marketplace";
 import {
   ExperienceContext,
   useExperience,
@@ -26,34 +20,21 @@ import { DialogLayer } from "@/components/interactive/dialogs";
 export { useExperience } from "@/components/interactive/experience-context";
 
 export function ExperienceProvider({ children }: { children: ReactNode }) {
-  const [samples] = useState(sampleListings);
-  const [localListings, setLocalListings] = useState<readonly LocalListing[]>(
-    [],
-  );
+  const identity = useNostrIdentity();
+  const marketplace = useNostrMarketplace();
   const [filter, setFilter] = useState<MarketplaceFilter>("all");
   const [modal, setModal] = useState<ModalSelection | null>(null);
-  const [toast, setToast] = useState<{ message: string } | null>(null);
-  const nextId = useRef(0);
   const previousFocus = useRef<HTMLElement | null>(null);
   const marketplaceRef = useRef<HTMLElement | null>(null);
-  const listings = useMemo<readonly Listing[]>(
-    () => [...localListings, ...samples],
-    [localListings, samples],
-  );
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 5500);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
   const openModal = useCallback(
     (selection: ModalSelection, trigger?: HTMLElement) => {
-      previousFocus.current =
+      const target =
         trigger ??
         (document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null);
+      // Switching planning dialogs should return to the original page trigger.
+      if (!target?.closest("dialog")) previousFocus.current = target;
       setModal(selection);
     },
     [],
@@ -65,72 +46,23 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
       target.focus({ preventScroll: true });
     else marketplaceRef.current?.focus({ preventScroll: true });
   }, []);
-  const addListing = useCallback((input: LocalListingInput) => {
-    // Allocate outside the updater: StrictMode may invoke state updaters twice.
-    const listing: LocalListing = {
-      ...input,
-      id: `local-${++nextId.current}`,
-      local: true,
-    };
-    setLocalListings((current) => [listing, ...current]);
-    setFilter("all");
-    setModal(null);
-    setToast({
-      message:
-        "Your preview is ready. It stays here until you reload—nothing is published.",
-    });
-    marketplaceRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-      block: "start",
-    });
-  }, []);
-  const removeListing = useCallback((id: string) => {
-    setLocalListings((current) =>
-      current.filter((listing) => listing.id !== id),
-    );
-    setModal(null);
-    setToast({ message: "Local preview removed. Nothing was published." });
-  }, []);
-  const value = useMemo(
-    () => ({
-      listings,
-      filter,
-      setFilter,
-      modal,
-      openModal,
-      closeModal,
-      restoreFocus,
-      addListing,
-      removeListing,
-      marketplaceRef,
-    }),
-    [
-      listings,
-      filter,
-      modal,
-      openModal,
-      closeModal,
-      restoreFocus,
-      addListing,
-      removeListing,
-    ],
-  );
+  const value = {
+    identity,
+    marketplace,
+    listings: marketplace.listings,
+    filter,
+    setFilter,
+    modal,
+    openModal,
+    closeModal,
+    restoreFocus,
+    marketplaceRef,
+  };
 
   return (
     <ExperienceContext.Provider value={value}>
       {children}
       <DialogLayer />
-      <div
-        id="toast"
-        className="toast"
-        role="status"
-        aria-live="polite"
-        hidden={!toast}
-      >
-        {toast?.message}
-      </div>
     </ExperienceContext.Provider>
   );
 }
