@@ -52,7 +52,11 @@ const Profile = mongoose.models.Profile || mongoose.model('Profile', ProfileSche
 const Listing = mongoose.models.Listing || mongoose.model('Listing', ListingSchema);
 const Booking = mongoose.models.Booking || mongoose.model('Booking', BookingSchema);
 
-const MONGODB_URI = 'mongodb+srv://joshxion_db_user:62AOD2OetlhwkGEg@cluster0.fssus3m.mongodb.net/satslots?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('✗ MONGODB_URI environment variable is required');
+  process.exit(1);
+}
 
 async function seedMongoDB() {
   try {
