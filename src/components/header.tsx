@@ -1,9 +1,13 @@
 "use client";
 
+import { AccountMenu } from "./interactive/account-menu";
 import { NostrAccount } from "./interactive/nostr-account";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ListSpaceButton } from "@/components/interactive/experience-provider";
+import {
+  ListSpaceButton,
+  useExperience,
+} from "@/components/interactive/experience-provider";
 
 function currentTheme() {
   return document.documentElement.classList.contains("dark");
@@ -29,6 +33,7 @@ const serverTheme = () => false;
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const dark = useSyncExternalStore(subscribeTheme, currentTheme, serverTheme);
+  const { user, openModal } = useExperience();
 
   useEffect(() => {
     const wideScreen = window.matchMedia("(min-width: 1024px)");
@@ -95,6 +100,17 @@ export function Header() {
               <use href="#sun" />
             </svg>
           </button>
+          {user ? (
+            <AccountMenu />
+          ) : (
+            <button
+              type="button"
+              className="nav-login hidden sm:flex items-center gap-2 text-sm"
+              onClick={() => openModal({ kind: "auth", authMode: "login" })}
+            >
+              Login
+            </button>
+          )}
           <ListSpaceButton className="nav-cta hidden sm:flex items-center gap-3">
             List your space{" "}
             <svg className="icon icon-small" aria-hidden="true">

@@ -9,7 +9,6 @@ import { IconSprite } from "@/components/icon-sprite";
 import { ExperienceProvider } from "@/components/interactive/experience-provider";
 import { Marketplace } from "@/components/interactive/marketplace";
 import { HowItWorks } from "@/components/interactive/how-it-works";
-
 export default function HomePage() {
   return (
     <ExperienceProvider>

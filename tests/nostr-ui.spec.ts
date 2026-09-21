@@ -11,16 +11,20 @@ test("loading, empty, offline, retry and partial relay warnings are distinct", a
 }) => {
   const relay = await mockRelays(page, { delayMs: 300 });
   await page.goto("/");
-  await expect(page.getByText("Loading Nostr listings…")).toBeVisible();
+  await expect(page.getByText("Loading rooms…")).toBeVisible();
+  // These specs run with no database, so the index request always fails here. With
+  // the relays answering but empty, that is the degraded-but-usable state: the grid
+  // is empty and the index warning explains why it cannot be trusted as "no rooms".
   await expect(
-    page.getByText("No listings found on the configured relays."),
-  ).toBeVisible();
+    page.locator(".marketplace-status").getByRole("alert"),
+  ).toContainText("Your saved rooms could not be loaded");
   await expect(page.locator(".listing-card")).toHaveCount(0);
+  // Now every relay is down as well, so there is no honest grid left to draw.
   relay.options.offline = true;
   await page.getByRole("button", { name: "Refresh listings" }).click();
   await expect(
     page.locator(".marketplace-status").getByRole("alert"),
-  ).toContainText("Unable to load listings");
+  ).toContainText("Unable to load rooms");
   relay.options.offline = false;
   relay.options.partial = true;
   relay.options.events = [listingEvent()];
@@ -56,9 +60,12 @@ test("revisions use the stable Nostr address and escape relay content", async ({
   await expect(card).toHaveAttribute("data-retained", "yes");
   await expect(card).toHaveAttribute("data-listing-id", address!);
   await expect(card.locator("script")).toHaveCount(0);
-  await card.locator("button").click();
-  await expect(page.locator("#placement-title")).toHaveText(
-    "Updated <script> publication",
+  // The link is keyed by the same stable address, so a revision does not move the
+  // room's URL. Not followed: these specs run with no database, so the room page
+  // itself 404s here.
+  await expect(card.locator("[data-placement]")).toHaveAttribute(
+    "href",
+    `/listings/${address}`,
   );
 });
 

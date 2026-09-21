@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import Script from "next/script";
 import "./globals.css";
 
 const dmSans = localFont({
@@ -52,7 +51,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <Script src="./theme-init.js" strategy="beforeInteractive" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { const r = document.documentElement; if (r.dataset.theme !== "manual") { r.classList.toggle("dark", window.matchMedia("(prefers-color-scheme: dark)").matches); window.dispatchEvent(new Event("satslots-theme-change")); } })();`,
+          }}
+        />
       </head>
       <body
         className={`${dmSans.variable} ${instrumentSerif.variable} ${ibmPlexMono.variable} min-h-dvh antialiased`}

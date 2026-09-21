@@ -12,6 +12,9 @@ export { connectNostr, getNostrProfile, mapNostrProfile } from "./identity";
 export {
   buildListingEvent,
   parseListingEvent,
+  buildListingAddress,
+  parseListingAddress,
+  isListingId,
   LISTING_KIND,
   LISTING_NAMESPACE,
   LISTING_TOPIC,

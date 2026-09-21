@@ -244,7 +244,14 @@ textarea:focus-visible {
 .desktop-nav a:hover::after {
   width: 100%;
 }
-.nav-cta {
+/*
+ * The two bordered header controls. The account menu shares this styling rather
+ * than the .nav-cta class itself: the browser tests locate ".nav-cta" with a
+ * single-element locator, so a second element carrying that class fails them in
+ * strict mode. Grouping the rules here keeps the look identical either way.
+ */
+.nav-cta,
+.nav-account-menu {
   border: 1px solid var(--ink);
   min-height: 40px;
   padding: 9px 15px;
@@ -254,9 +261,18 @@ textarea:focus-visible {
     background 0.2s,
     color 0.2s;
 }
-.nav-cta:hover {
+.nav-cta:hover,
+.nav-account-menu:hover {
   background: var(--ink);
   color: var(--paper);
+}
+/* Signed out, sign-in sits beside the bordered controls as a quieter text action. */
+.nav-login {
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.nav-login:hover {
+  color: var(--ink);
 }
 .theme-toggle {
   color: var(--muted);
@@ -1069,6 +1085,184 @@ h2 em {
   max-width: 100%;
   gap: 3px;
 }
+
+/* Listing split layout - 60/40 split */
+.listing-split-layout {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  gap: 40px;
+  margin-top: 30px;
+}
+
+@media (max-width: 1024px) {
+  .listing-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left side: Ad feed (Twitter thread style) */
+.listing-ad-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ad-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ad-thread-card {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--card);
+  transition: border-color 0.2s;
+}
+
+.ad-thread-card:hover {
+  border-color: var(--muted);
+}
+
+.ad-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ad-thread-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--button-text);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-thread-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-thread-author {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ad-thread-time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ad-thread-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ad-thread-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.ad-thread-image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  max-height: 300px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: block;
+  min-height: 150px;
+  background-color: var(--soft);
+}
+
+.ad-thread-image:hover {
+  transform: scale(1.02);
+}
+
+.ad-thread-image[src=""] {
+  display: none;
+}
+
+.ad-thread-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+
+/* Status indicators for bookings */
+.status-approved {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-completed {
+  color: var(--muted);
+}
+
+/* Right side: Listing details panel */
+.listing-details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.booking-section {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--card);
+}
+
+.booking-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.booking-section .dialog-lead {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* Status indicators for bookings */
+.status-approved {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-completed {
+  color: var(--muted);
+}
+
 .role-toggle > button {
   font-size: 10px;
   display: flex;
@@ -2464,8 +2658,7 @@ html.dark {
 /* The account disclosure remains usable on narrow screens and both themes. */
 .nostr-account {
   position: relative;
-}
-.nostr-account-panel {
+}.nostr-account-panel {
   position: absolute;
   right: 0;
   top: calc(100% + 1rem);
@@ -2503,6 +2696,76 @@ button:disabled {
   white-space: nowrap;
 }
 
+/*
+ * Signed-in account menu: the username trigger plus its Dashboard/Logout panel.
+ * The trigger's box comes from the grouped .nav-cta rule near the top of this file.
+ */
+.account-menu {
+  position: relative;
+}
+.account-menu-name {
+  max-width: min(10rem, 26vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  min-width: 14rem;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid currentColor;
+  box-shadow: 0 8px 24px #0002;
+  z-index: 30;
+}
+/* Without this, display: flex above would defeat the [hidden] attribute. */
+.account-menu-panel[hidden] {
+  display: none;
+}
+.account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: inherit;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.account-menu-item:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+.account-menu-profile {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0.25rem;
+}
+.account-menu-username {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+.account-menu-lightning {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 0.25rem 0;
+}
+.account-menu-bio {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
 @media (max-width: 1023px) {
   .nav-row {
     position: relative;
@@ -2511,6 +2774,16 @@ button:disabled {
     position: static;
   }
   .nostr-account-panel {
+    top: 100%;
+    max-height: calc(100dvh - 7rem);
+    overflow-y: auto;
+  }
+  /* Anchored to the header row rather than the trigger, so the panel cannot be
+     clipped by the viewport edge on a narrow screen. */
+  .account-menu {
+    position: static;
+  }
+  .account-menu-panel {
     top: 100%;
     max-height: calc(100dvh - 7rem);
     overflow-y: auto;
@@ -2563,4 +2836,108 @@ button:disabled {
   font-size: 11px;
   color: var(--muted);
   margin-block: 12px;
+}
+
+/* Dashboard: what a signed-in owner and booker sees at /dashboard. */
+.dashboard {
+  padding-block: 48px 72px;
+}
+.dashboard h1 {
+  margin-bottom: 8px;
+}
+.dashboard-list {
+  list-style: none;
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+.dashboard-card {
+  border: 1px solid var(--rule);
+  background: var(--card);
+  padding: 18px;
+}
+.dashboard-card h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.dashboard-card .booking-summary {
+  margin: 16px 0;
+}
+.status-pill {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  color: var(--muted);
+}
+.status-pending {
+  color: var(--accent);
+}
+.status-approved,
+.status-completed {
+  color: var(--ink);
+}
+.form-error {
+  margin-block: 12px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* Booking creative box and card layout. */
+.booking-card-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.booking-card-details {
+  flex: 1;
+  min-width: 0;
+}
+.creative-box {
+  flex-shrink: 0;
+  width: 200px;
+  height: 150px;
+  border: 1px solid var(--rule);
+  background: var(--soft);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.creative-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.creative-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+}
+.creative-ad-id {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  word-break: break-all;
+}
+.creative-pubkey {
+  font-size: 10px;
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .booking-card-layout {
+    flex-direction: column;
+  }
+  .creative-box {
+    width: 100%;
+    height: 180px;
+  }
 }

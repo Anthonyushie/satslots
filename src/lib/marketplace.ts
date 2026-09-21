@@ -40,6 +40,58 @@ export function formatSats(value: number): string {
 export function isCategory(value: string): value is Category {
   return categories.some((category) => category === value);
 }
+
+/**
+ * A room as the marketplace grid shows it.
+ *
+ * The grid is fed by two sources that do not share a shape: our own index in
+ * Postgres, and listing events discovered on relays — which include rooms other
+ * clients published that we have never indexed. Both are mapped into this one
+ * shape so a card renders identically either way.
+ */
+export interface MarketplaceListing {
+  readonly address: string;
+  readonly name: string;
+  readonly category: Category;
+  readonly description: string;
+  readonly priceSats: number;
+  readonly pubkey: string;
+  /** Which source this room came from. */
+  readonly source: "index" | "relay";
+  /**
+   * Seconds since epoch. For an indexed room this is when the row was created; for
+   * a relay room it is the listing event's own timestamp.
+   */
+  readonly createdAt: number;
+  /**
+   * Null for a room that was saved but never accepted by a relay. That is a real
+   * state, not an error: saving and publishing are separate steps and the publish
+   * can fail on its own.
+   */
+  readonly eventId: string | null;
+  /** Room banner image URL, if set by the publisher. */
+  readonly imageUrl: string | null;
+}
+
+/**
+ * Combines the two sources into one grid, keyed by Nostr address.
+ *
+ * Where both know a room, the index wins. That is deliberate rather than
+ * arbitrary: a card links to `/listings/<address>`, which resolves against the
+ * index, so preferring relay metadata would let a card and the page it opens
+ * disagree about the same room.
+ */
+export function mergeListings(
+  indexed: readonly MarketplaceListing[],
+  fromRelays: readonly MarketplaceListing[],
+): MarketplaceListing[] {
+  const byAddress = new Map(indexed.map((listing) => [listing.address, listing]));
+  for (const listing of fromRelays) {
+    if (!byAddress.has(listing.address)) byAddress.set(listing.address, listing);
+  }
+  return [...byAddress.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);

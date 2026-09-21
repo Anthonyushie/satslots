@@ -17,9 +17,11 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run preview",
+    // A production build is required first: the app is no longer a static
+    // export, and `next start` serves the .next build output rather than `out/`.
+    command: "npm run build && npm run start",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    timeout: 180_000,
   },
 });
