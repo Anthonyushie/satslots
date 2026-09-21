@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { listingEvent, mockRelays } from "./nostr-fixture";
+import { buildListingAddress } from "../src/lib/nostr/listing-event";
+import { listingEvent, mockRelays, testPubkey } from "./nostr-fixture";
 
 test.beforeEach(async ({ page }) => {
   await mockRelays(page, { events: [listingEvent()] });
@@ -40,26 +41,21 @@ test("filters relay placements and switches publisher instructions", async ({
   );
 });
 
-test("booking is explicitly blocked and native dialog restores focus", async ({
-  page,
-}) => {
-  const trigger = page.locator("[data-placement]");
-  await trigger.click();
-  await expect(page.locator("#placement-content")).toContainText("3,000 sats");
-  await expect(
-    page.getByRole("button", { name: "Booking unavailable" }),
-  ).toBeDisabled();
-  await expect(page.locator("#booking-unavailable")).toContainText(
-    "No booking is created",
+test("a listing card links to its shareable room page", async ({ page }) => {
+  // The card used to open a modal, which left a listing with no address to share.
+  // It is a link now, keyed by the listing's Nostr address.
+  const link = page.locator("[data-placement]");
+  await expect(link).toHaveAttribute(
+    "href",
+    `/listings/${buildListingAddress(testPubkey, "test-space")}`,
   );
-  await expect(page.getByRole("button", { name: /Simulate/ })).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#placement-dialog")).not.toBeVisible();
-  await expect(trigger).toBeFocused();
-  await expect(page.locator("body")).not.toHaveClass(/dialog-open/);
+  await expect(link).toHaveAttribute("data-placement", /^30078:/);
+  // Not followed: these specs run against a production build with no database, so
+  // the room page itself 404s here. Its resolution is covered by test:api.
+  expect(page.locator("#placement-dialog")).toHaveCount(0);
 });
 
-test("publisher form never inserts local inventory or sends a mutation", async ({
+test("publisher form sends nothing until signed in and adds no local inventory", async ({
   page,
 }) => {
   const mutations: string[] = [];
@@ -70,14 +66,16 @@ test("publisher form never inserts local inventory or sends a mutation", async (
   await trigger.click();
   await page.locator("#site-name").fill("Indie <script> & Open");
   await page.locator("#site-url").fill("https://example.com");
-  await page.locator("#site-description").fill("Independent creators.");
-  await expect(
-    page.getByRole("button", { name: "Publishing unavailable" }),
-  ).toBeDisabled();
+  await page.locator("#site-description").fill("A banner above the fold.");
+  await page.locator("#site-audience").fill("Independent creators.");
+  await page.locator("#site-duration").fill("30");
+  await page.locator("#site-max-ads").fill("3");
   await page
     .locator("#publisher-form")
     .evaluate((form: HTMLFormElement) => form.requestSubmit());
-  await expect(page.locator("#publisher-dialog")).toBeVisible();
+  // No session, so the form refuses locally and asks the visitor to sign in
+  // rather than posting a room the server would reject.
+  await expect(page.locator("#auth-dialog")).toBeVisible();
   await expect(page.locator(".listing-card")).toHaveCount(1);
   expect(mutations).toEqual([]);
   await page.keyboard.press("Escape");
@@ -89,7 +87,7 @@ test("Escape closes dialogs and FAQ keeps one answer open", async ({
 }) => {
   await page.getByRole("button", { name: "Project notes" }).click();
   await expect(page.locator("#about-dialog")).toContainText(
-    "Authenticated backend sessions",
+    "Database-backed publishing",
   );
   await page.keyboard.press("Escape");
   await expect(page.locator("#about-dialog")).not.toBeVisible();
@@ -122,18 +120,18 @@ for (const width of [390, 400, 768, 1024, 1440, 1920]) {
   });
 }
 
-test("mobile navigation and dialog remain usable", async ({ page }) => {
+test("mobile navigation and listing link remain usable", async ({ page }) => {
   await page.setViewportSize({ width: 400, height: 860 });
   await page.locator("#menu-toggle").click();
   await expect(page.locator("#mobile-nav")).toBeVisible();
   await page.locator('#mobile-nav a[href="#spaces"]').click();
   await expect(page.locator("#mobile-nav")).not.toBeVisible();
-  await page.locator("[data-placement]").click();
+  // The room link replaced a modal, so on a phone it must still be reachable and
+  // fully on screen rather than clipped by the card's edge.
   expect(
-    await page.locator("#placement-dialog").evaluate((el) => {
+    await page.locator("[data-placement]").evaluate((el) => {
       const rect = el.getBoundingClientRect();
-      return rect.left >= 0 && rect.right <= innerWidth;
+      return rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth;
     }),
   ).toBeTruthy();
-  await page.keyboard.press("Escape");
 });

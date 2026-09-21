@@ -2,12 +2,14 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ComponentPropsWithRef,
   type ReactNode,
 } from "react";
 import { type MarketplaceFilter } from "@/lib/marketplace";
+import { fetchSession, signOut, type SessionUser } from "@/lib/auth/client";
 import { useNostrIdentity } from "./use-nostr-identity";
 import { useNostrMarketplace } from "./use-nostr-marketplace";
 import {
@@ -24,8 +26,30 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
   const marketplace = useNostrMarketplace();
   const [filter, setFilter] = useState<MarketplaceFilter>("all");
   const [modal, setModal] = useState<ModalSelection | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const previousFocus = useRef<HTMLElement | null>(null);
   const marketplaceRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSession().then((session) => {
+      if (cancelled) return;
+      setUser(session);
+      setSessionLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Re-reads the session after a sign-in or sign-out. */
+  const refreshSession = useCallback(async () => {
+    const session = await fetchSession();
+    setUser(session);
+    setSessionLoaded(true);
+  }, []);
+
   const openModal = useCallback(
     (selection: ModalSelection, trigger?: HTMLElement) => {
       const target =
@@ -39,14 +63,43 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const isAuthenticated = user !== null;
+
   const closeModal = useCallback(() => setModal(null), []);
+
+
+  useEffect(() => {
+    if (!sessionLoaded || identity.connection || !user) return;
+    let cancelled = false;
+    signOut()
+      .catch(() => { })
+      .then(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionLoaded, identity.connection, user]);
+
   const restoreFocus = useCallback(() => {
     const target = previousFocus.current;
     if (target?.isConnected && !target.closest("[hidden]"))
       target.focus({ preventScroll: true });
     else marketplaceRef.current?.focus({ preventScroll: true });
   }, []);
+
+  const logout = useCallback(async () => {
+    await signOut();
+    setUser(null);
+    setModal(null);
+  }, []);
+
   const value = {
+    isAuthenticated,
+    user: isAuthenticated ? user : null,
+    refreshSession,
+    logout,
     identity,
     marketplace,
     listings: marketplace.listings,

@@ -72,6 +72,44 @@ export function isListingId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 }
 
+/**
+ * The canonical address of a listing: `kind:pubkey:d`.
+ *
+ * Composed here and nowhere else, because three things must agree on it: this
+ * module, `listings.address` in db/migrations (generated from the same three
+ * parts), and the `/listings/<address>` URL. When they disagree, a listing
+ * discovered on a relay cannot be resolved to its row — which is exactly the bug
+ * 0011_address_namespace.sql fixes. listing-address.test.ts asserts the SQL and
+ * this function produce the same string.
+ */
+export function buildListingAddress(pubkey: string, listingId: string): string {
+  return `${LISTING_KIND}:${pubkey}:${LISTING_NAMESPACE}${listingId}`;
+}
+
+/**
+ * Splits an address back into its parts, or null if it is not a valid one.
+ *
+ * Anchored rather than split on ":", because LISTING_NAMESPACE itself ends in a
+ * colon — the `d` component is `satslots:<listingId>`, so the address contains
+ * four colon-separated runs, not three. The fixed-width hex pubkey between two
+ * explicit delimiters is what makes this unambiguous.
+ *
+ * An address arrives from a URL path, so it is untrusted input and every part is
+ * validated rather than assumed.
+ */
+export function parseListingAddress(
+  value: unknown,
+): { pubkey: string; listingId: string } | null {
+  if (typeof value !== "string" || value.length > 256) return null;
+  const match = /^([0-9]+):([0-9a-f]{64}):(.+)$/.exec(value);
+  if (!match) return null;
+  const [, kind, pubkey, d] = match;
+  if (kind !== String(LISTING_KIND)) return null;
+  if (!d.startsWith(LISTING_NAMESPACE)) return null;
+  const listingId = d.slice(LISTING_NAMESPACE.length);
+  return isListingId(listingId) ? { pubkey, listingId } : null;
+}
+
 export function buildListingEvent(
   input: ListingInput,
   createdAt = Math.floor(Date.now() / 1000),
@@ -157,7 +195,7 @@ function parseVerifiedListing(event: Event): NostrListing | null {
     return {
       ...content,
       listingId,
-      address: `${LISTING_KIND}:${event.pubkey}:${d}`,
+      address: buildListingAddress(event.pubkey, listingId),
       eventId: event.id,
       pubkey: event.pubkey,
       createdAt: event.created_at,

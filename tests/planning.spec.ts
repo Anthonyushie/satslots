@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { listingEvent, mockRelays, mockExtension } from "./nostr-fixture";
+import {
+  buildListingAddress,
+  parseListingEvent,
+} from "../src/lib/nostr/listing-event";
+import {
+  listingEvent,
+  mockRelays,
+  mockExtension,
+  testPubkey,
+} from "./nostr-fixture";
 
 async function preparePage(page: Page) {
   const relay = await mockRelays(page, { events: [listingEvent()] });
@@ -31,32 +40,25 @@ async function fillCreative(page: Page) {
     .fill("https://example.com/sponsor");
 }
 
-test("listing review is local, escaped, invalidated on edit, and never persisted", async ({
+test("publishing signed out is refused locally, escaped, and never persisted", async ({
   page,
 }) => {
   const { relay, unexpectedRequests } = await preparePage(page);
   await page.locator(".nav-cta").click();
-  await page.getByRole("button", { name: "Review listing locally" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Unsaved listing review" }),
-  ).toHaveCount(0);
   await page.getByLabel("Publication name").fill("Local <script> publisher");
   await page
     .getByLabel("Website URL", { exact: true })
     .fill("https://example.com");
+  await page.getByLabel("The placement").fill("A banner above the fold.");
   await page.getByLabel("Who is it for?").fill("Independent readers");
-  await page.getByRole("button", { name: "Review listing locally" }).click();
+  await page.getByRole("button", { name: "Publish room" }).click();
+  // Signed out, publishing is refused before any request is made, and the visitor
+  // is sent to sign in instead.
+  await expect(page.locator("#auth-dialog")).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Listing review and persistence" }),
-  ).toContainText("Local <script> publisher");
-  await expect(page.locator("#publisher-form script")).toHaveCount(0);
-  await page.getByLabel("Publication name").fill("Changed publication");
-  await expect(
-    page.getByRole("heading", { name: "Unsaved listing review" }),
+    page.getByRole("heading", { name: "Publishing this room" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Publishing unavailable" }),
-  ).toBeDisabled();
+  await expect(page.locator("#publisher-form script")).toHaveCount(0);
   await page.reload();
   await page.locator(".nav-cta").click();
   await expect(page.getByLabel("Publication name")).toHaveValue("");
@@ -64,40 +66,20 @@ test("listing review is local, escaped, invalidated on edit, and never persisted
   expect(unexpectedRequests).toEqual([]);
 });
 
-test("booking dates validate locally and checkout never produces an invoice", async ({
+test("a card links to the room's own address, derived from the relay event", async ({
   page,
 }) => {
   const { relay, unexpectedRequests } = await preparePage(page);
-  const trigger = page.locator("[data-placement]");
-  await trigger.click();
-  await page.getByLabel("Requested start date").fill("2027-05-10");
-  await page.getByLabel("Requested end date").fill("2027-05-09");
-  await page.getByRole("button", { name: "Review requested dates" }).click();
-  await expect(
-    page.getByText("Requested dates:", { exact: false }),
-  ).toHaveCount(0);
-  await page.getByLabel("Requested end date").fill("2027-05-12");
-  await page.getByRole("button", { name: "Review requested dates" }).click();
-  await expect(
-    page.getByText("Requested dates:", { exact: false }),
-  ).toContainText("Not reserved or saved");
-  await expect(
-    page.getByRole("button", { name: "Booking unavailable" }),
-  ).toBeDisabled();
-  await expect(
-    page.getByText("No invoice is available.", { exact: false }),
-  ).toBeVisible();
-  await page.getByLabel("Requested start date").fill("2027-05-11");
-  await expect(
-    page.getByText("Requested dates:", { exact: false }),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: "Prepare campaign creative" }).click();
-  await expect(page.locator("#campaigns-dialog")).toBeVisible();
-  await expect(page.locator("#placement-dialog")).not.toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(trigger).toBeFocused();
-  await trigger.click();
-  await expect(page.getByLabel("Requested start date")).toHaveValue("");
+  // Derived from the event the relay actually served, not a hand-written string:
+  // the card's link has to match what parseListingEvent reports, or the address on
+  // screen is not the address the event carries.
+  const parsed = parseListingEvent(listingEvent());
+  expect(parsed).not.toBeNull();
+  const link = page.locator("[data-placement]");
+  await expect(link).toHaveAttribute("href", `/listings/${parsed?.address}`);
+  expect(parsed?.address).toBe(buildListingAddress(testPubkey, "test-space"));
+  // Not followed. These specs run against a production build with no database, so
+  // resolving a room page is covered by `npm run test:api` instead.
   expect(relay.publications).toEqual([]);
   expect(unexpectedRequests).toEqual([]);
 });

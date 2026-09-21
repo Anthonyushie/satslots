@@ -1,108 +1,147 @@
 <img width="150" height="150" alt="favicon" src="https://github.com/user-attachments/assets/50c7de83-6a3f-42d2-a4bc-a24fa4c3c5a5" />
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="9" fill="#f5f3eb"/><path d="M9 13h24v8H17v6h22v8H9z" fill="#dd532a"/><path d="M36 5v10m-5-5h10" stroke="#dd532a" stroke-width="3"/></svg>
-
 
 # SatSlots
 
 **Your space. Your terms. Your sats.**
 
-A responsive sponsorship-marketplace landing page built with **Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS 4**. The original editorial design is preserved: warm paper, olive-black ink, burnt-orange accents, custom publication artwork, and local typography.
+A Bitcoin-native sponsorship marketplace built with **Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, and MongoDB**. Publishers list ad slots, advertisers book them, and payments flow via Lightning Network through Polar (regtest) for local development.
 
 ## Quick start
 
-Requires Node.js **20.19 or newer** (including the Nostr cryptography dependencies). A currently supported Node.js LTS release is recommended.
+Requires Node.js **20.19 or newer**.
 
 ```sh
 npm ci
+cp .env.example .env   # fill in MongoDB URI and Polar LND config
 npm run dev
 ```
 
-Open the local address printed by Next.js (normally port 3000).
+Open http://localhost:3000.
 
-## Production
+## Database
+
+**MongoDB Atlas** (or local MongoDB). All schemas live in `src/lib/mongodb/schemas.ts` as Mongoose models. No migrations needed — Mongoose creates collections on first write.
+
+| Collection         | Purpose                              |
+| ------------------ | ------------------------------------ |
+| `profiles`         | User identity (pubkey, username, bio, lightning address) |
+| `listings`         | Ad slots (price, duration, capacity) |
+| `bookings`         | Reservations (status, dates)         |
+| `payments`         | Lightning invoices and settlement    |
+| `sessions`         | Auth session tokens                  |
+| `authchallenges`   | NIP-42 nonces                        |
+| `campaigns`        | Ad campaigns                         |
+| `reviews`          | Booking reviews                      |
+| `listingcomments`  | Thread comments on listings          |
+
+## Lightning payments (Polar / regtest)
+
+Invoices are created via a local **Polar LND** node. No real Bitcoin is involved.
+
+### Setup
+
+1. Install [Polar](https://lightningpolar.com/) and create a new network with at least one LND node (e.g. "alice").
+
+2. Start the network in Polar.
+
+3. Get the admin macaroon (hex-encoded):
+   ```sh
+   # Replace NETWORK_ID and NODE_NAME with your Polar network
+   xxd -p ~/.polar/networks/NETWORK_ID/volumes/lnd/NODE_NAME/data/chain/bitcoin/regtest/admin.macaroon | tr -d '\n'
+   ```
+
+4. Check the REST port mapping in Polar's docker-compose (usually `8080` internally, mapped to `8087` or similar externally).
+
+5. Update `.env`:
+   ```
+   LIGHTNING_BACKEND=lnd
+   LND_REST_URL=https://localhost:8087
+   LND_MACAROON=<hex from step 3>
+   ```
+
+6. If your Polar network was freshly created, mine some blocks so LND can sync:
+   ```sh
+   docker exec polar-NETWORK_ID-backend1 bitcoin-cli -regtest -rpcuser=polaruser -rpcpassword=polarpass -generate 101
+   ```
+
+7. Restart the LND nodes after mining (LND needs to sync from genesis):
+   ```sh
+   docker restart polar-NETWORK_ID-NODE_NAME
+   ```
+
+### Funding a node and opening channels
+
+To pay invoices, the payer node needs sats and a channel to the invoice node:
 
 ```sh
-npm run build
-npm run preview
+# Get an address from the payer node
+docker exec -u lnd polar-NETWORK_ID-payer lncli --network=regtest --rpcserver=localhost:10009 newaddress p2wkh
+
+# Send bitcoin from the mining wallet
+docker exec polar-NETWORK_ID-backend1 bitcoin-cli -regtest -rpcuser=polaruser -rpcpassword=polarpass sendtoaddress <address> 5.0
+
+# Mine to confirm
+docker exec polar-NETWORK_ID-backend1 bitcoin-cli -regtest -rpcuser=polaruser -rpcpassword=polarpass -generate 1
+
+# Connect to the invoice node and open a channel
+docker exec -u lnd polar-NETWORK_ID-payer lncli --network=regtest --rpcserver=localhost:10009 connect <INVOICE_NODE_PUBKEY>@polar-NETWORK_ID-INVOICE_NODE:9735
+docker exec -u lnd polar-NETWORK_ID-payer lncli --network=regtest --rpcserver=localhost:10009 openchannel --node_key=<INVOICE_NODE_PUBKEY> --local_amt=10000000
+
+# Mine to confirm the channel
+docker exec polar-NETWORK_ID-backend1 bitcoin-cli -regtest -rpcuser=polaruser -rpcpassword=polarpass -generate 3
 ```
 
-This landing page uses Next.js static export. `next build` prerenders the page into `out/` and bundles the React client interactions. `npm run preview` serves that built directory on port 3000. **Do not use `next start` with this static-export configuration.**
+## Authentication
 
-Deploy `out/` at the root of any static host, or deploy the repository to a host that supports Next.js builds. If adding API routes, server actions, or request-time rendering later, remove `output: "export"` from `next.config.ts` and configure a server deployment. For a subdirectory deployment, configure Next.js `basePath` before building.
+Sign-in is **NIP-42 challenge/response**. No passwords, no email.
 
-`build` explicitly uses webpack for predictable compatibility. No development server, CDN, or third-party font request is required to run the production page.
+1. `POST /api/auth/challenge` issues a single-use nonce (SHA-256 hashed, 5-min expiry).
+2. The browser signs a kind-`22242` event with the user's NIP-07 extension.
+3. `POST /api/auth/verify` verifies the signature and redeems the nonce.
+4. A session token is issued as an `httpOnly` cookie; only its hash is stored.
 
 ## Project structure
 
 ```text
 src/
   app/
-    layout.tsx                 Metadata, local fonts, global styles
-    page.tsx                   Server-rendered page composition
-    globals.css                Brand system + build-time Tailwind
-    fonts/                     Bundled fonts and OFL license
-  components/
-    header.tsx                 Mobile navigation and theme control
-    hero.tsx                   Original publisher/payment illustration
-    principle-strip.tsx
-    manifesto.tsx
-    faq.tsx                    Native details/summary interaction
-    closing.tsx
-    footer.tsx
-    icon-sprite.tsx             Shared inline SVG symbol definitions
-    interactive/
-      experience-context.tsx   Typed shared state contract
-      experience-provider.tsx  Listings, modals, toast, action buttons
-      marketplace.tsx          Filters and sample/local listing cards
-      how-it-works.tsx          Advertiser/publisher perspectives
-      dialogs.tsx              Listing form and simulated booking
+    api/
+      auth/         challenge, verify, session, logout, profile
+      bookings/     CRUD + anonymous + status updates
+      payments/     create invoice, status poll, webhook
+      listings/     CRUD + event publishing + comments
+    dashboard/      User dashboard (server component)
+    listings/       Listing detail page
+    login/          Login page
+    page.tsx        Landing page
   lib/
-    marketplace.ts             Typed sample inventory and helpers
-public/
-  theme-init.js                System-theme initialization
-  assets/                     Favicon and font-license notice
- tests/
-  landing.spec.ts              Production browser regression tests
+    mongodb/        Mongoose client, schemas, queries
+    lightning/      Invoice creation (LND, NWC, Lightning Address)
+    nostr/          Nostr client, identity, listing events, discovery
+    auth/           NIP-42 challenge/response, sessions
+    api/            Route handler helpers, Zod schemas
+  components/
+    interactive/    Client-side React components
+scripts/
+  nwc-listener.mjs  Standalone NWC payment confirmation listener
+  seed-mongodb.mjs  Seed test data into MongoDB
+  test-api.mjs      API integration tests
+  test-auth.mjs     Auth flow tests
 ```
 
-Static sections are React Server Components. Interactive sections use client components, typed state, and native dialog refs—not injected HTML or the old vanilla-JavaScript implementation. Fonts are handled by `next/font/local`; Tailwind is compiled through PostCSS.
-
-## Checks
+## Production
 
 ```sh
-npm run typecheck
-npm run lint
-npm run format:check
 npm run build
-npx playwright install chromium
-npm run test:e2e
+npm run start
 ```
 
-The Playwright suite serves the production export automatically if no preview is already running. It checks hydration and assets, filtering, role switching, booking calculations and boundaries, simulated payment, publisher validation, escaped preview text, preview removal, modal focus restoration, mobile navigation, themes, and overflow at 390, 400, 768, 1024, 1440, and 1920 pixels.
-
-For a system-installed Chromium, optionally set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable path. The browser tests use this only as a local test setting; it is not a secret.
-
-## What is—and isn't—live
-
-**Working:** filters, listing details, duration-based prices, a simulated booking journey, publisher/advertiser instructions, local listing creation/removal, themes, FAQs, and mobile navigation.
-
-**Not connected in the UI:** Nostr identity or relay publishing. A standalone P0 service is available in `src/lib/nostr` for NIP-07 connection/signing, profile mapping, listing publication, and validated relay discovery. See the [integration handoff for @wutche](docs/nostr-integration.md) and [listing event contract](docs/nostr-listing-event.md). Run `npm run test:nostr` for isolated service tests. Backend authentication is separate from connecting a Nostr extension.
-
-**Not implemented:** website ownership verification, real availability or reservations, publisher approval, Lightning invoices or settlement, banner delivery, or dispute handling. The page and dialogs label these limitations explicitly. No keys or credentials are required to browse the existing demo; Nostr signing requires a NIP-07 extension, which keeps private keys outside the app.
-
-Publisher form data stays in browser memory and disappears on reload. The website field is checked for an HTTP(S) URL but is not contacted or verified. No analytics, tracking pixels, signup endpoint, wallet, or real payment is connected. React escapes publisher-supplied text.
-
-The sample publications and prices are illustrative—not customer endorsements or real inventory. SatSlots is a concept for BOSS Battle 2026, not an official or endorsed Bitshala product. Track eligibility is not confirmed.
-
-## Before launching the marketplace
-
-Implement and test the missing identity, inventory, payment, and delivery services. Add moderation, advertising disclosures, privacy/legal terms, and clear refund rules. Direct upfront payment is **not escrow**; advertisers accept non-delivery risk. Placement checks cannot guarantee human impressions, clicks, or conversions. Avoid anonymity or censorship-resistance guarantees unsupported by the implementation.
+This app is **not** a static export. It requires a Node-capable runtime because the MongoDB URI and LND macaroon must stay server-side.
 
 ## Typography
 
-DM Sans, Instrument Serif, and IBM Plex Mono are bundled under the SIL Open Font License 1.1. Copyright and license notices are in `src/app/fonts/LICENSE.txt` and `public/assets/font-licenses.css`. Font files are unchanged.
+DM Sans, Instrument Serif, and IBM Plex Mono are bundled under the SIL Open Font License 1.1. Copyright and license notices are in `src/app/fonts/LICENSE.txt`.
 
-## Preview artifact
+## License
 
-The downloadable source is the complete Next.js project, excluding installed dependencies and generated build directories. The separately supplied browser preview is compiled from this project; only its generated asset paths are adjusted for the preview host's relative-path requirements.
-# satslots
+SatSlots is a concept for BOSS Battle 2026. Not an official or endorsed Bitshala product.

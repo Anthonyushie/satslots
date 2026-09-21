@@ -1,11 +1,16 @@
 "use client";
-import { categories, formatSats } from "@/lib/marketplace";
-import type { NostrListing } from "@/lib/nostr";
+import Link from "next/link";
+import {
+  categories,
+  formatSats,
+  type MarketplaceListing,
+} from "@/lib/marketplace";
 import { Icon, useExperience } from "./experience-context";
 import { ListSpaceButton } from "./experience-provider";
 
-function ListingCard({ listing }: { listing: NostrListing }) {
-  const { filter, openModal } = useExperience();
+function ListingCard({ listing }: { listing: MarketplaceListing }) {
+  const { filter } = useExperience();
+  const href = `/listings/${listing.address}`;
   return (
     <article
       className="listing-card"
@@ -14,12 +19,22 @@ function ListingCard({ listing }: { listing: NostrListing }) {
       hidden={filter !== "all" && filter !== listing.category}
     >
       <div className="listing-art custom-listing-art">
-        <div className="mini-masthead flex justify-between">
-          <span>NOSTR MARKETPLACE</span>
-          <span>UNVERIFIED LISTING</span>
-        </div>
-        <div className="mini-editorial">{listing.name}</div>
-        <span className="placement-type">WEBSITE BANNER</span>
+        {listing.imageUrl ? (
+          <img
+            src={listing.imageUrl}
+            alt={listing.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <>
+            <div className="mini-masthead flex justify-between">
+              <span>NOSTR MARKETPLACE</span>
+              <span>UNVERIFIED LISTING</span>
+            </div>
+            <div className="mini-editorial">{listing.name}</div>
+            <span className="placement-type">WEBSITE BANNER</span>
+          </>
+        )}
       </div>
       <div className="listing-body">
         <div className="listing-category mono">{listing.category}</div>
@@ -31,20 +46,14 @@ function ListingCard({ listing }: { listing: NostrListing }) {
           <div className="listing-price">
             {formatSats(listing.priceSats)} <span>sats / day</span>
           </div>
-          <button
-            type="button"
+          <Link
             className="placement-button"
+            href={href}
             data-placement={listing.address}
             aria-label={`View ${listing.name} placement`}
-            onClick={(event) =>
-              openModal(
-                { kind: "placement", listingAddress: listing.address },
-                event.currentTarget,
-              )
-            }
           >
             <Icon name="arrow-up" />
-          </button>
+          </Link>
         </div>
       </div>
     </article>
@@ -110,27 +119,38 @@ export function Marketplace() {
           ))}
         </div>
         <span className="mono muted market-note">
-          DISCOVERED ON NOSTR RELAYS.
+          SAVED ROOMS AND NOSTR RELAYS.
         </span>
       </div>
       <div className="marketplace-status" aria-live="polite">
         {marketplace.status === "loading" && (
-          <p role="status">Loading Nostr listings…</p>
+          <p role="status">Loading rooms…</p>
         )}
         {marketplace.status === "error" && (
           <p role="alert">
-            Unable to load listings from relays.{" "}
-            {listings.length > 0 && "Previously loaded listings may be stale."}
+            Unable to load rooms from the index or from relays.{" "}
+            {listings.length > 0 && "Previously loaded rooms may be stale."}
           </p>
         )}
-        {marketplace.status === "ready" && listings.length === 0 && (
-          <p>No listings found on the configured relays.</p>
+        {marketplace.status === "ready" && marketplace.indexUnavailable && (
+          <p role="alert">
+            Your saved rooms could not be loaded, so only relay listings are
+            shown. Rooms you have published yourself may be missing until this
+            recovers.
+          </p>
         )}
+        {/* Not shown alongside the index warning below: "no rooms yet" would
+            contradict "your saved rooms could not be loaded". */}
+        {marketplace.status === "ready" &&
+          listings.length === 0 &&
+          !marketplace.indexUnavailable && (
+            <p>No rooms yet. Publish one and it will appear here.</p>
+          )}
         {marketplace.status === "ready" &&
           listings.length > 0 &&
           !listings.some(
             (listing) => filter === "all" || listing.category === filter,
-          ) && <p>No listings match this category.</p>}
+          ) && <p>No rooms match this category.</p>}
         {marketplace.status === "ready" &&
           marketplace.relays.some((relay) => !relay.ok) && (
             <p>Some relays are unavailable. Results may be incomplete.</p>
@@ -161,8 +181,8 @@ export function Marketplace() {
       </div>
       <div className="market-bottom flex flex-col sm:flex-row justify-between gap-3">
         <p>
-          Public Nostr listings are unverified. Booking and payments are
-          unavailable.
+          Public Nostr listings are unverified. Booking works; Lightning payment
+          is not connected yet.
         </p>
         <ListSpaceButton className="text-link">
           Your corner of the internet belongs here{" "}

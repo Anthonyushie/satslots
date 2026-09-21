@@ -9,31 +9,37 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
-    "preview": "serve out -l 3000",
+    "start": "next start -p 3000",
+    "preview": "next start -p 3000",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:e2e": "playwright test",
+    "test:auth": "node --env-file-if-exists=.env scripts/test-auth.mjs",
+    "test:api": "node --env-file-if-exists=.env scripts/test-api.mjs",
     "test:nostr": "playwright test --config playwright.nostr.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "mongoose": "^9.10.1",
     "next": "16.3.4",
     "nostr-tools": "2.25.2",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "4.3.0",
     "@types/node": "^22.19.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.1",
     "eslint-config-next": "16.3.4",
-    "serve": "^14.2.5",
-    "typescript": "~5.9.3",
+    "prettier": "3.9.6",
     "tailwindcss": "4.3.0",
-    "@tailwindcss/postcss": "4.3.0",
-    "prettier": "3.9.6"
+    "typescript": "~5.9.3"
   }
 }

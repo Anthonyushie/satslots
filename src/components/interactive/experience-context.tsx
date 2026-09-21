@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, type RefObject } from "react";
-import type { MarketplaceFilter } from "@/lib/marketplace";
-import type { NostrListing } from "@/lib/nostr";
+import type { MarketplaceFilter, MarketplaceListing } from "@/lib/marketplace";
+import type { SessionUser } from "@/lib/auth/client";
 import type { useNostrIdentity } from "./use-nostr-identity";
 import type { useNostrMarketplace } from "./use-nostr-marketplace";
 
@@ -10,9 +10,13 @@ export type ModalSelection =
   | { kind: "publisher" }
   | { kind: "about" }
   | { kind: "campaigns" }
-  | { kind: "placement"; listingAddress: string };
+  | { kind: "auth"; authMode: "signup" | "login"; authSubMode?: "nostr" | "email" };
 export interface ExperienceContextValue {
-  listings: readonly NostrListing[];
+  isAuthenticated: boolean;
+  user: SessionUser | null;
+  refreshSession: () => Promise<void>;
+  logout: () => Promise<void>;
+  listings: readonly MarketplaceListing[];
   identity: ReturnType<typeof useNostrIdentity>;
   marketplace: ReturnType<typeof useNostrMarketplace>;
   filter: MarketplaceFilter;

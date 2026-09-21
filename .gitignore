@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .env*
+# ...but the template must be committed: it documents the required variables
+# and contains no secrets.
+!.env.example
