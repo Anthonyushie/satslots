@@ -26,19 +26,21 @@ export function CampaignAreaButton({
 }
 
 export function CampaignArea() {
+  const { modal, user } = useExperience();
+  const bookingId = modal?.kind === "campaigns" ? modal.bookingId : undefined;
   return (
     <>
       <h2 id="campaigns-title">
         Your next <em>campaign.</em>
       </h2>
       <p className="dialog-lead">
-        A local planning workspace, not a campaign dashboard. No saved campaigns
-        are loaded. Prepare a creative and inspect the planned delivery and
-        reporting surfaces.
+        {user
+          ? "Create a campaign for a paid placement, activate its iframe, and inspect live delivery totals."
+          : "Preview a creative locally. Sign in and complete a paid booking to save and activate it."}
       </p>
-      <CampaignEditor />
-      <AdDeliveryPreview />
-      <CampaignAnalytics />
+      <CampaignEditor initialBookingId={bookingId} />
+      {!user && <AdDeliveryPreview />}
+      {!user && <CampaignAnalytics />}
     </>
   );
 }

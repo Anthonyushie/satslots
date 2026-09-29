@@ -6,16 +6,20 @@ export function AdCreative({
   headline,
   description,
   localImageUrl,
+  live = false,
 }: {
   headline?: string;
   description?: string;
   localImageUrl?: string;
+  live?: boolean;
 }) {
   return (
     <div className="ad-creative" aria-label="Ad creative presentation">
       {headline || description || localImageUrl ? (
         <>
-          <span className="eyebrow">LOCAL PREVIEW · NOT SERVING</span>
+          <span className="eyebrow">
+            {live ? "ACTIVE CAMPAIGN" : "LOCAL PREVIEW · NOT SERVING"}
+          </span>
           {localImageUrl && (
             <Image
               src={localImageUrl}

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BookingActions } from "@/components/interactive/booking-actions";
@@ -194,7 +195,7 @@ export default async function DashboardPage() {
         <h2 id="rooms-heading">Rooms you own</h2>
         {myRooms.length === 0 ? (
           <Empty>
-            You have not created a room yet. Use "List your space" in the header
+            You have not created a room yet. Use &quot;List your space&quot; in the header
             to add one.
           </Empty>
         ) : (

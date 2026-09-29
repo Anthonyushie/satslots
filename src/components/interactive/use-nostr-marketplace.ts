@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { discoverListings, type NostrListing, type RelayResult } from "@/lib/nostr";
+import {
+  discoverListings,
+  type NostrListing,
+  type RelayResult,
+} from "@/lib/nostr";
 import {
   isCategory,
   mergeListings,
@@ -106,18 +110,37 @@ export function useNostrMarketplace() {
     // saved but not yet published exists only in the index; a room from another
     // client exists only on the relays. Requiring both would hide exactly the rooms
     // this grid is meant to show.
+    const indexRequest = fetchIndexedRooms();
+    const relayRequest = discoverListings();
+
+    // Relay discovery is usually immediate while a sleeping database can take
+    // several seconds to time out. Render verified relay results as soon as they
+    // arrive instead of making the whole marketplace wait for the index.
+    void relayRequest
+      .then((result) => {
+        if (request !== operation.current) return;
+        const usable = result.relays.some((relay) => relay.ok);
+        if (!usable) return;
+        setState({
+          status: "ready",
+          listings: result.listings.map(fromRelay),
+          relays: result.relays,
+          indexUnavailable: true,
+        });
+      })
+      .catch(() => {});
+
     const [index, relays] = await Promise.allSettled([
-      fetchIndexedRooms(),
-      discoverListings(),
+      indexRequest,
+      relayRequest,
     ]);
     if (request !== operation.current) return;
 
     const indexRooms = index.status === "fulfilled" ? index.value : [];
-    const relayResults = relays.status === "fulfilled" ? relays.value.relays : [];
+    const relayResults =
+      relays.status === "fulfilled" ? relays.value.relays : [];
     const relayRooms =
-      relays.status === "fulfilled"
-        ? relays.value.listings.map(fromRelay)
-        : [];
+      relays.status === "fulfilled" ? relays.value.listings.map(fromRelay) : [];
 
     // A relay that is down is reported per-relay (`ok: false`) rather than thrown,
     // so `discoverListings` still fulfils when every relay fails. A rejection is

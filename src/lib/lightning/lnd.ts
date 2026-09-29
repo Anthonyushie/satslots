@@ -54,6 +54,33 @@ function lndPost(path: string, body: unknown): Promise<unknown> {
   });
 }
 
+function lndGet(path: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(`${LND_URL}${path}`);
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        rejectUnauthorized: false,
+        headers: { "Grpc-Metadata-macaroon": MACAROON },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk: string) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 400)
+            reject(new Error(`LND ${res.statusCode}: ${data}`));
+          else resolve(JSON.parse(data));
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 export async function createInvoiceLnd(
   params: CreateInvoiceParams,
 ): Promise<LightningInvoice> {
@@ -67,4 +94,16 @@ export async function createInvoiceLnd(
     bolt11: data.payment_request,
     paymentHash: Buffer.from(data.r_hash, "base64").toString("hex"),
   };
+}
+
+export async function isInvoiceSettledLnd(
+  paymentHash: string,
+): Promise<boolean> {
+  const data = (await lndGet(
+    `/v1/invoice/${encodeURIComponent(paymentHash)}`,
+  )) as {
+    settled?: boolean;
+    state?: string;
+  };
+  return data.settled === true || data.state === "SETTLED";
 }

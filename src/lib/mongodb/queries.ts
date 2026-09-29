@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getMongo } from "./client";
 import { Listing, Booking, Payment, Profile, Session, AuthChallenge, ListingComment } from "./schemas";
 

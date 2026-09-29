@@ -2,7 +2,7 @@ import "server-only";
 import type { ZodType } from "zod";
 import { jsonError } from "@/lib/auth/http";
 import { getSession, type SessionUser } from "@/lib/auth/session";
-import { isRouteError } from "@/lib/db/client";
+import { isRouteError } from "@/lib/mongodb/client";
 
 /**
  * Shared plumbing for the marketplace routes.

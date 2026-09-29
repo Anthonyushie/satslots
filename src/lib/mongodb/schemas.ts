@@ -16,7 +16,7 @@ const ProfileSchema = new Schema<IProfile>({
   bio: String,
   lightning_address: String,
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  updated_at: { type: Date, default: Date.now },
 });
 
 // ===== Listing Schema =====
@@ -55,7 +55,7 @@ const ListingSchema = new Schema<IListing>({
   lightning_address: String,
   published: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  updated_at: { type: Date, default: Date.now },
 });
 
 // ===== Booking Schema =====
@@ -65,7 +65,7 @@ export interface IBooking extends Document {
   advertiser_pubkey: string;
   campaign_id?: string;
   ad_id: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'completed';
+  status: "pending" | "approved" | "rejected" | "cancelled" | "completed";
   starts_on: Date;
   ends_on: Date;
   image_url?: string;
@@ -80,17 +80,17 @@ const BookingSchema = new Schema<IBooking>({
   advertiser_pubkey: { type: String, required: true, index: true },
   campaign_id: String,
   ad_id: { type: String, required: true },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'rejected', 'cancelled', 'completed'],
-    default: 'pending'
+  status: {
+    type: String,
+    enum: ["pending", "approved", "rejected", "cancelled", "completed"],
+    default: "pending",
   },
   starts_on: { type: Date, required: true },
   ends_on: { type: Date, required: true },
   image_url: String,
   website_url: String,
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  updated_at: { type: Date, default: Date.now },
 });
 
 // ===== Payment Schema =====
@@ -98,10 +98,11 @@ export interface IPayment extends Document {
   id: string;
   booking_id: string;
   amount_sats: number;
-  status: 'pending' | 'invoiced' | 'settled' | 'failed' | 'refunded';
+  status: "pending" | "invoiced" | "settled" | "failed" | "refunded";
   ln_invoice: string;
   payment_hash: string;
   settled_at?: Date;
+  expires_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
@@ -110,16 +111,17 @@ const PaymentSchema = new Schema<IPayment>({
   id: { type: String, required: true, unique: true },
   booking_id: { type: String, required: true, index: true },
   amount_sats: { type: Number, required: true },
-  status: { 
-    type: String, 
-    enum: ['pending', 'invoiced', 'settled', 'failed', 'refunded'],
-    default: 'pending'
+  status: {
+    type: String,
+    enum: ["pending", "invoiced", "settled", "failed", "refunded"],
+    default: "pending",
   },
   ln_invoice: { type: String, required: true },
   payment_hash: { type: String, required: true, unique: true },
   settled_at: Date,
+  expires_at: Date,
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  updated_at: { type: Date, default: Date.now },
 });
 
 // ===== Session Schema =====
@@ -138,7 +140,7 @@ const SessionSchema = new Schema<ISession>({
   token: { type: String, required: true, unique: true },
   expires_at: { type: Date, required: true },
   created_at: { type: Date, default: Date.now },
-  revoked_at: Date
+  revoked_at: Date,
 });
 
 // ===== AuthChallenge Schema =====
@@ -157,16 +159,22 @@ const AuthChallengeSchema = new Schema<IAuthChallenge>({
   challenge: { type: String, required: true },
   created_at: { type: Date, default: Date.now },
   expires_at: { type: Date, required: true },
-  consumed_at: Date
+  consumed_at: Date,
 });
 
 // ===== Campaign Schema =====
 export interface ICampaign extends Document {
   id: string;
   advertiser_pubkey: string;
+  booking_id: string;
   name: string;
+  headline: string;
+  description?: string;
   website_url: string;
   image_url?: string;
+  status: "draft" | "active" | "paused";
+  impressions: number;
+  clicks: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -174,11 +182,21 @@ export interface ICampaign extends Document {
 const CampaignSchema = new Schema<ICampaign>({
   id: { type: String, required: true, unique: true },
   advertiser_pubkey: { type: String, required: true, index: true },
+  booking_id: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
+  headline: { type: String, required: true },
+  description: String,
   website_url: { type: String, required: true },
-  image_url: String,
+  image_url: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["draft", "active", "paused"],
+    default: "draft",
+  },
+  impressions: { type: Number, default: 0, min: 0 },
+  clicks: { type: Number, default: 0, min: 0 },
   created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  updated_at: { type: Date, default: Date.now },
 });
 
 // ===== Review Schema =====
@@ -197,7 +215,7 @@ const ReviewSchema = new Schema<IReview>({
   reviewer_pubkey: { type: String, required: true, index: true },
   rating: { type: Number, required: true, min: 1, max: 5 },
   comment: String,
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
 });
 
 // ===== ListingComment Schema =====
@@ -214,16 +232,34 @@ const ListingCommentSchema = new Schema<IListingComment>({
   listing_id: { type: String, required: true, index: true },
   pubkey: { type: String, required: true, index: true },
   comment: { type: String, required: true },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
 });
 
 // Export models
-export const Profile = (mongoose.models.Profile as Model<IProfile>) || mongoose.model<IProfile>('Profile', ProfileSchema);
-export const Listing = (mongoose.models.Listing as Model<IListing>) || mongoose.model<IListing>('Listing', ListingSchema);
-export const Booking = (mongoose.models.Booking as Model<IBooking>) || mongoose.model<IBooking>('Booking', BookingSchema);
-export const Payment = (mongoose.models.Payment as Model<IPayment>) || mongoose.model<IPayment>('Payment', PaymentSchema);
-export const Session = (mongoose.models.Session as Model<ISession>) || mongoose.model<ISession>('Session', SessionSchema);
-export const AuthChallenge = (mongoose.models.AuthChallenge as Model<IAuthChallenge>) || mongoose.model<IAuthChallenge>('AuthChallenge', AuthChallengeSchema);
-export const Campaign = (mongoose.models.Campaign as Model<ICampaign>) || mongoose.model<ICampaign>('Campaign', CampaignSchema);
-export const Review = (mongoose.models.Review as Model<IReview>) || mongoose.model<IReview>('Review', ReviewSchema);
-export const ListingComment = (mongoose.models.ListingComment as Model<IListingComment>) || mongoose.model<IListingComment>('ListingComment', ListingCommentSchema);
+export const Profile =
+  (mongoose.models.Profile as Model<IProfile>) ||
+  mongoose.model<IProfile>("Profile", ProfileSchema);
+export const Listing =
+  (mongoose.models.Listing as Model<IListing>) ||
+  mongoose.model<IListing>("Listing", ListingSchema);
+export const Booking =
+  (mongoose.models.Booking as Model<IBooking>) ||
+  mongoose.model<IBooking>("Booking", BookingSchema);
+export const Payment =
+  (mongoose.models.Payment as Model<IPayment>) ||
+  mongoose.model<IPayment>("Payment", PaymentSchema);
+export const Session =
+  (mongoose.models.Session as Model<ISession>) ||
+  mongoose.model<ISession>("Session", SessionSchema);
+export const AuthChallenge =
+  (mongoose.models.AuthChallenge as Model<IAuthChallenge>) ||
+  mongoose.model<IAuthChallenge>("AuthChallenge", AuthChallengeSchema);
+export const Campaign =
+  (mongoose.models.Campaign as Model<ICampaign>) ||
+  mongoose.model<ICampaign>("Campaign", CampaignSchema);
+export const Review =
+  (mongoose.models.Review as Model<IReview>) ||
+  mongoose.model<IReview>("Review", ReviewSchema);
+export const ListingComment =
+  (mongoose.models.ListingComment as Model<IListingComment>) ||
+  mongoose.model<IListingComment>("ListingComment", ListingCommentSchema);

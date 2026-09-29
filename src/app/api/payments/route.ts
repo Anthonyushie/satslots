@@ -1,18 +1,14 @@
-import {
-  ok,
-  readJson,
-  requireUser,
-  route,
-} from "@/lib/api/handler";
+import { ok, readJson, requireUser, route } from "@/lib/api/handler";
+import crypto from "crypto";
 import { paymentCreateSchema } from "@/lib/api/schemas";
 import { isSameOrigin, jsonError } from "@/lib/auth/http";
 import { getMongo } from "@/lib/mongodb/client";
-import { 
+import {
   getBookingById,
   getPaymentByHash,
   createPayment,
   updatePaymentStatus,
-  getListingById
+  getListingById,
 } from "@/lib/mongodb/queries";
 import { createInvoice } from "@/lib/lightning/client";
 import { createInvoiceLightningAddress } from "@/lib/lightning/lightning-address";
@@ -57,7 +53,7 @@ interface Payment {
 export async function POST(request: Request): Promise<Response> {
   return route(async () => {
     await getMongo();
-    
+
     if (!isSameOrigin(request)) {
       return jsonError("Cross-origin request rejected.", 403);
     }
@@ -104,17 +100,29 @@ export async function POST(request: Request): Promise<Response> {
     const { Payment } = await import("@/lib/mongodb/schemas");
     const existingPayment = await Payment.findOne({
       booking_id: bookingId,
-      status: { $in: ['pending', 'invoiced'] }
+      status: { $in: ["pending", "invoiced"] },
     }).sort({ created_at: -1 });
 
-    if (existingPayment && existingPayment.ln_invoice && existingPayment.payment_hash) {
-      return ok({
-        paymentId: existingPayment.id,
-        invoice: existingPayment.ln_invoice,
-        paymentHash: existingPayment.payment_hash,
-        amountSats: existingPayment.amount_sats,
-        status: existingPayment.status,
-      });
+    if (
+      existingPayment &&
+      existingPayment.ln_invoice &&
+      existingPayment.payment_hash
+    ) {
+      const expiresAt =
+        existingPayment.expires_at ??
+        new Date(existingPayment.created_at.getTime() + 3_600_000);
+      if (expiresAt.getTime() <= Date.now()) {
+        await updatePaymentStatus(existingPayment.id, "failed");
+      } else {
+        return ok({
+          paymentId: existingPayment.id,
+          invoice: existingPayment.ln_invoice,
+          paymentHash: existingPayment.payment_hash,
+          amountSats: existingPayment.amount_sats,
+          status: existingPayment.status,
+          expiresAt: expiresAt.toISOString(),
+        });
+      }
     }
 
     // Create the invoice - use Lightning Address if available, otherwise use NWC
@@ -136,30 +144,36 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
     } catch (invoiceError) {
-      console.error('Failed to create invoice:', invoiceError);
-      return jsonError('Failed to create invoice. Please try again.', 500);
+      console.error("Failed to create invoice:", invoiceError);
+      return jsonError("Failed to create invoice. Please try again.", 500);
     }
 
     // Store the payment record.
+    const expiresAt = new Date(Date.now() + 3_600_000);
     const payment = await createPayment({
-      id: require("crypto").randomUUID(),
+      id: crypto.randomUUID(),
       booking_id: bookingId,
       amount_sats: amountSats,
-      status: 'invoiced',
+      status: "invoiced",
       ln_invoice: invoice.bolt11,
       payment_hash: invoice.paymentHash,
+      expires_at: expiresAt,
     });
 
     if (!payment) {
       return jsonError("Failed to create payment record.", 500);
     }
 
-    return ok({
-      paymentId: payment.id,
-      invoice: invoice.bolt11,
-      paymentHash: invoice.paymentHash,
-      amountSats,
-      status: "invoiced",
-    }, 201);
+    return ok(
+      {
+        paymentId: payment.id,
+        invoice: invoice.bolt11,
+        paymentHash: invoice.paymentHash,
+        amountSats,
+        status: "invoiced",
+        expiresAt: expiresAt.toISOString(),
+      },
+      201,
+    );
   });
 }

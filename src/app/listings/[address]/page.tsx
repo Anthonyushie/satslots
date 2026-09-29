@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -277,7 +278,6 @@ export default async function ListingPage({ params }: Context) {
                 listingId={room.id}
                 priceSats={room.price_sats}
                 adDurationDays={room.ad_duration_days}
-                publisherPubkey={room.pubkey}
               />
             </div>
 

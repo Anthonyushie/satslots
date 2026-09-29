@@ -27,7 +27,6 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
   const [filter, setFilter] = useState<MarketplaceFilter>("all");
   const [modal, setModal] = useState<ModalSelection | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [sessionLoaded, setSessionLoaded] = useState(false);
   const previousFocus = useRef<HTMLElement | null>(null);
   const marketplaceRef = useRef<HTMLElement | null>(null);
 
@@ -36,7 +35,6 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
     fetchSession().then((session) => {
       if (cancelled) return;
       setUser(session);
-      setSessionLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -47,7 +45,6 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
   const refreshSession = useCallback(async () => {
     const session = await fetchSession();
     setUser(session);
-    setSessionLoaded(true);
   }, []);
 
   const openModal = useCallback(
@@ -68,19 +65,6 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
 
   const closeModal = useCallback(() => setModal(null), []);
 
-
-  useEffect(() => {
-    if (!sessionLoaded || identity.connection || !user) return;
-    let cancelled = false;
-    signOut()
-      .catch(() => { })
-      .then(() => {
-        if (!cancelled) setUser(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionLoaded, identity.connection, user]);
 
   const restoreFocus = useCallback(() => {
     const target = previousFocus.current;

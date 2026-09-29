@@ -32,3 +32,13 @@ export async function createInvoice(
   const { createInvoiceNwc } = await import("./nwc");
   return createInvoiceNwc(params);
 }
+
+/** Checks settlement when the selected backend supports request-time lookup. */
+export async function checkInvoiceSettled(
+  paymentHash: string,
+): Promise<boolean | null> {
+  const backend = process.env.LIGHTNING_BACKEND ?? "nwc";
+  if (backend !== "lnd") return null;
+  const { isInvoiceSettledLnd } = await import("./lnd");
+  return isInvoiceSettledLnd(paymentHash);
+}
