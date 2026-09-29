@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from "react";
 import { useExperience } from "@/components/interactive/experience-provider";
 import { DialogLayer } from "@/components/interactive/dialogs";

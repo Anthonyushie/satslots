@@ -17,17 +17,15 @@ export async function getMongo(): Promise<void> {
   if (!globalThis.__satslotsMongoConnected) {
     const connectionString = process.env.MONGODB_URI;
     if (!connectionString) {
-      throw new Error(
-        "MONGODB_URI is not set. Add it to your .env file.",
-      );
+      throw new Error("MONGODB_URI is not set. Add it to your .env file.");
     }
-    
+
     await mongoose.connect(connectionString, {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 15000,
       socketTimeoutMS: 45000,
     });
-    
+
     globalThis.__satslotsMongoConnected = true;
   }
 }
@@ -37,4 +35,46 @@ export async function disconnectMongo(): Promise<void> {
     await mongoose.disconnect();
     globalThis.__satslotsMongoConnected = false;
   }
+}
+
+const NETWORK_CODES = new Set([
+  "ETIMEDOUT",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EPIPE",
+  "ENOTFOUND",
+  "EADDRNOTAVAIL",
+  "EAI_AGAIN",
+]);
+
+/** Classifies connection failures so API routes can return a useful 503. */
+export function isRouteError(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  const visit = (candidate: unknown): boolean => {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      seen.has(candidate)
+    )
+      return false;
+    seen.add(candidate);
+    const value = candidate as {
+      code?: unknown;
+      message?: unknown;
+      errors?: unknown;
+      cause?: unknown;
+    };
+    if (typeof value.code === "string" && NETWORK_CODES.has(value.code))
+      return true;
+    if (
+      typeof value.message === "string" &&
+      /connection|server selection|network|timed? ?out/i.test(value.message)
+    )
+      return true;
+    if (Array.isArray(value.errors) && value.errors.some(visit)) return true;
+    return visit(value.cause);
+  };
+  return visit(error);
 }

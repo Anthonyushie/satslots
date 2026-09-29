@@ -9,7 +9,7 @@ import type { useNostrMarketplace } from "./use-nostr-marketplace";
 export type ModalSelection =
   | { kind: "publisher" }
   | { kind: "about" }
-  | { kind: "campaigns" }
+  | { kind: "campaigns"; bookingId?: string }
   | { kind: "auth"; authMode: "signup" | "login"; authSubMode?: "nostr" | "email" };
 export interface ExperienceContextValue {
   isAuthenticated: boolean;

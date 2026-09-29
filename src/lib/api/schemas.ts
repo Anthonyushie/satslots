@@ -32,7 +32,10 @@ const websiteUrl = z
 
 const lightningAddress = z
   .string()
-  .regex(/^[^@]+@[^@]+\.[^@]+$/, "Must be a valid lightning address (user@domain.com).")
+  .regex(
+    /^[^@]+@[^@]+\.[^@]+$/,
+    "Must be a valid lightning address (user@domain.com).",
+  )
   .optional()
   .nullable();
 
@@ -174,3 +177,26 @@ export const anonymousBookingSchema = z.object({
 });
 
 export type AnonymousBookingInput = z.infer<typeof anonymousBookingSchema>;
+
+const creativeImage = z
+  .string()
+  .max(7_000_000, "Creative image is too large.")
+  .refine(
+    (value) =>
+      /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) ||
+      isSafeHttpUrl(value),
+    { message: "Use a PNG, JPEG, WebP upload or a safe image URL." },
+  );
+
+export const campaignSaveSchema = z.object({
+  id: z.uuid("Must be a campaign id.").optional(),
+  bookingId: z.uuid("Choose a paid booking."),
+  name: text(1, 80, "Campaign name"),
+  headline: text(1, 80, "Headline"),
+  description: text(1, 160, "Description").optional().or(z.literal("")),
+  destinationUrl: websiteUrl,
+  imageUrl: creativeImage,
+  status: z.enum(["draft", "active", "paused"]).default("draft"),
+});
+
+export type CampaignSaveInput = z.infer<typeof campaignSaveSchema>;

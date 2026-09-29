@@ -6,7 +6,7 @@ const questions = [
   {
     question: "Can I book a placement right now?",
     answer:
-      "Not yet. You can connect a Nostr identity and browse public relay listings, but publishers and availability are unverified. Publishing, booking, and payments remain unavailable until backend contracts are connected.",
+      "Yes. Sign in with a Nostr key, choose an available room, and pay its Lightning invoice. Public relay listings and publisher claims remain unverified, so start with a small placement.",
   },
   {
     question: "Why bitcoin? Why sats?",

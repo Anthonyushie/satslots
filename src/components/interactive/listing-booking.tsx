@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { formatSats } from "@/lib/marketplace";
+import { useExperience } from "./experience-context";
 
 /** Anonymous booking result from the API. */
 interface BookingResult {
@@ -15,6 +16,7 @@ interface BookingResult {
   roomTitle: string;
   startsOn: string;
   endsOn: string;
+  expiresAt: string;
 }
 
 /** Adds whole days to a YYYY-MM-DD string in UTC, matching the server's helper. */
@@ -28,23 +30,20 @@ export function ListingBooking({
   listingId,
   priceSats,
   adDurationDays,
-  publisherPubkey,
 }: {
   listingId: string;
   priceSats: number;
   adDurationDays: number;
-  publisherPubkey: string;
 }) {
   const router = useRouter();
+  const { user, openModal } = useExperience();
   const [startsOn, setStartsOn] = useState("");
-  const [email, setEmail] = useState("");
   const [adName, setAdName] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState<BookingResult | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const startRef = useRef<HTMLInputElement>(null);
   const [, startTransition] = useTransition();
 
@@ -57,9 +56,25 @@ export function ListingBooking({
   const endsOn = startsOn ? addDays(startsOn, adDurationDays - 1) : null;
   const quotedTotal = startsOn ? adDurationDays * priceSats : null;
 
-  // Poll for payment status after booking is created.
   useEffect(() => {
     if (!booking || paymentStatus === "settled") return;
+    const update = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((Date.parse(booking.expiresAt) - Date.now()) / 1000),
+      );
+      setRemainingSeconds(remaining);
+      if (remaining === 0) setPaymentStatus("failed");
+    };
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [booking, paymentStatus]);
+
+  // Poll for payment status after booking is created.
+  useEffect(() => {
+    if (!booking || paymentStatus === "settled" || paymentStatus === "failed")
+      return;
 
     const interval = setInterval(async () => {
       try {
@@ -68,8 +83,8 @@ export function ListingBooking({
         );
         if (response.ok) {
           const data = await response.json();
-          if (data.status === "settled") {
-            setPaymentStatus("settled");
+          if (data.status === "settled" || data.status === "failed") {
+            setPaymentStatus(data.status);
             clearInterval(interval);
             startTransition(() => router.refresh());
           }
@@ -85,35 +100,51 @@ export function ListingBooking({
   async function bookAndPay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!user) {
+      setError("Sign in with Nostr before booking this placement.");
+      openModal({ kind: "auth", authMode: "login" });
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setBooking(null);
     setPaymentStatus(null);
 
     try {
-      const response = await fetch("/api/bookings/anonymous", {
+      const bookingResponse = await fetch("/api/bookings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           listingId,
           startsOn,
-          contactEmail: email,
-          adName: adName || undefined,
-          imageUrl: imageUrl || undefined,
-          websiteUrl: websiteUrl || undefined,
+          adId: adName.trim() || crypto.randomUUID(),
         }),
       });
-
+      const bookingData = (await bookingResponse.json().catch(() => ({}))) as {
+        error?: unknown;
+        booking?: { id?: string; startsOn?: string; endsOn?: string };
+      };
+      if (!bookingResponse.ok || !bookingData.booking?.id) {
+        setError(
+          typeof bookingData.error === "string"
+            ? bookingData.error
+            : "Could not create booking.",
+        );
+        return;
+      }
+      const response = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bookingId: bookingData.booking.id }),
+      });
       const data = (await response.json().catch(() => ({}))) as {
         error?: unknown;
-        bookingId?: string;
+        paymentId?: string;
         invoice?: string;
         paymentHash?: string;
         amountSats?: number;
-        days?: number;
-        roomTitle?: string;
-        startsOn?: string;
-        endsOn?: string;
+        expiresAt?: string;
       };
 
       if (!response.ok) {
@@ -125,20 +156,55 @@ export function ListingBooking({
         return;
       }
 
-      if (data.bookingId && data.invoice) {
+      if (data.invoice) {
         setBooking({
-          bookingId: data.bookingId,
+          bookingId: bookingData.booking.id,
           invoice: data.invoice,
           paymentHash: data.paymentHash ?? "",
-          amountSats: data.amountSats ?? (quotedTotal ?? 0),
-          days: data.days ?? adDurationDays,
-          roomTitle: data.roomTitle ?? "",
-          startsOn: data.startsOn ?? startsOn,
-          endsOn: data.endsOn ?? (endsOn ?? ""),
+          amountSats: data.amountSats ?? quotedTotal ?? 0,
+          days: adDurationDays,
+          roomTitle: "",
+          startsOn: bookingData.booking.startsOn ?? startsOn,
+          endsOn: bookingData.booking.endsOn ?? endsOn ?? "",
+          expiresAt:
+            data.expiresAt ?? new Date(Date.now() + 3_600_000).toISOString(),
         });
+        setPaymentStatus("invoiced");
       }
     } catch {
       setError("Could not reach the server. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryInvoice() {
+    if (!booking) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.bookingId }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not create another invoice.");
+      setBooking({
+        ...booking,
+        invoice: data.invoice,
+        paymentHash: data.paymentHash,
+        amountSats: data.amountSats,
+        expiresAt: data.expiresAt,
+      });
+      setPaymentStatus("invoiced");
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not create another invoice.",
+      );
     } finally {
       setBusy(false);
     }
@@ -155,8 +221,8 @@ export function ListingBooking({
       <h2 id="booking-heading">Book a slot</h2>
       <p className="dialog-lead">
         Pick a start date. The ad runs for {adDurationDays}{" "}
-        {adDurationDays === 1 ? "day" : "days"} from there — that length is set by
-        the publisher.
+        {adDurationDays === 1 ? "day" : "days"} from there — that length is set
+        by the publisher.
       </p>
 
       {!booking && (
@@ -175,45 +241,15 @@ export function ListingBooking({
             }}
           />
 
-          <label htmlFor="booking-email">Your email</label>
-          <input
-            className="w-full"
-            id="booking-email"
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-
-          <label htmlFor="booking-ad-name">Ad name (optional)</label>
+          <label htmlFor="booking-ad-name">Ad name</label>
           <input
             className="w-full"
             id="booking-ad-name"
             type="text"
             placeholder="My Product"
+            required
             value={adName}
             onChange={(event) => setAdName(event.target.value)}
-          />
-
-          <label htmlFor="booking-image-url">Banner image URL (optional)</label>
-          <input
-            className="w-full"
-            id="booking-image-url"
-            type="url"
-            placeholder="https://example.com/banner.png"
-            value={imageUrl}
-            onChange={(event) => setImageUrl(event.target.value)}
-          />
-
-          <label htmlFor="booking-website-url">Website URL (optional)</label>
-          <input
-            className="w-full"
-            id="booking-website-url"
-            type="url"
-            placeholder="https://example.com"
-            value={websiteUrl}
-            onChange={(event) => setWebsiteUrl(event.target.value)}
           />
 
           {startsOn && endsOn && quotedTotal !== null && (
@@ -244,7 +280,7 @@ export function ListingBooking({
           <button
             type="submit"
             className="button button-ink w-full"
-            disabled={busy || !startsOn || !email}
+            disabled={busy || !startsOn || !adName.trim()}
           >
             {busy ? "Creating invoice…" : "Book & Pay with Lightning"}
           </button>
@@ -260,12 +296,10 @@ export function ListingBooking({
       {booking && (
         <div className="booking-summary" role="status">
           <h3>
-            {paymentStatus === "settled"
-              ? "Payment received!"
-              : "Scan to pay"}
+            {paymentStatus === "settled" ? "Payment received!" : "Scan to pay"}
           </h3>
 
-          {paymentStatus !== "settled" && (
+          {paymentStatus !== "settled" && paymentStatus !== "failed" && (
             <>
               <div className="qr-container">
                 <QRCodeSVG
@@ -284,6 +318,13 @@ export function ListingBooking({
                 <span>Runs</span>
                 <span>
                   {booking.startsOn} → {booking.endsOn}
+                </span>
+              </div>
+              <div>
+                <span>Invoice expires</span>
+                <span>
+                  {Math.floor(remainingSeconds / 60)}:
+                  {String(remainingSeconds % 60).padStart(2, "0")}
                 </span>
               </div>
 
@@ -314,18 +355,47 @@ export function ListingBooking({
           )}
 
           {paymentStatus === "settled" && (
-            <p>
-              Your payment has been confirmed! The room owner will see your
-              booking on their dashboard.
-            </p>
+            <>
+              <p>
+                Your payment has been confirmed. Build and activate the creative
+                for this placement.
+              </p>
+              <button
+                type="button"
+                className="button button-ink w-full"
+                onClick={(event) =>
+                  openModal(
+                    { kind: "campaigns", bookingId: booking.bookingId },
+                    event.currentTarget,
+                  )
+                }
+              >
+                Create campaign
+              </button>
+            </>
+          )}
+          {paymentStatus === "failed" && (
+            <>
+              <p role="alert" className="form-error">
+                This invoice expired before payment was confirmed.
+              </p>
+              <button
+                type="button"
+                className="button button-ink w-full"
+                disabled={busy}
+                onClick={() => void retryInvoice()}
+              >
+                {busy ? "Creating invoice…" : "Create a new invoice"}
+              </button>
+            </>
           )}
         </div>
       )}
 
       {!booking && (
         <p className="booking-warning">
-          No login required. Enter your details above, then pay with Lightning
-          to confirm your booking.
+          Sign in with Nostr, reserve the dates, then pay with Lightning to
+          confirm your booking.
         </p>
       )}
     </section>

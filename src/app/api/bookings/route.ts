@@ -4,6 +4,7 @@ import {
   requireUser,
   route,
 } from "@/lib/api/handler";
+import crypto from "crypto";
 import { bookingCreateSchema } from "@/lib/api/schemas";
 import { isSameOrigin, jsonError } from "@/lib/auth/http";
 import { getMongo } from "@/lib/mongodb/client";
@@ -188,7 +189,7 @@ export async function POST(request: Request): Promise<Response> {
     // Create the booking
     try {
       const booking = await createBooking({
-        id: require("crypto").randomUUID(),
+        id: crypto.randomUUID(),
         listing_id: listingId,
         advertiser_pubkey: pubkey,
         ad_id: adId,
@@ -212,8 +213,8 @@ export async function POST(request: Request): Promise<Response> {
           updatedAt: booking.updated_at
         }
       }, 201);
-    } catch (error: any) {
-      if (error.code === 11000) {
+    } catch (error: unknown) {
+      if ((error as { code?: unknown }).code === 11000) {
         // Duplicate key error - likely a race condition
         const existing = await getBookingByAdId(adId);
         if (existing && existing.advertiser_pubkey === pubkey) {

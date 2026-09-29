@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";

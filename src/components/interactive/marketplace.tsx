@@ -181,8 +181,8 @@ export function Marketplace() {
       </div>
       <div className="market-bottom flex flex-col sm:flex-row justify-between gap-3">
         <p>
-          Public Nostr listings are unverified. Booking works; Lightning payment
-          is not connected yet.
+          Public Nostr listings are unverified. Bookings and Lightning invoices
+          are confirmed by the SatSlots server.
         </p>
         <ListSpaceButton className="text-link">
           Your corner of the internet belongs here{" "}
